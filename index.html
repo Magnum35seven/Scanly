@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<title>Scanly — Document Scanner</title>
+<meta name="description" content="Scan documents with your camera, auto-crop and clean them up, and export crisp PDFs." />
+<meta name="theme-color" content="#0288D1" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Scanly" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<link rel="icon" href="icons/favicon-32.png" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ SCAN SCREEN ============ -->
+  <section class="screen" id="scan-screen">
+    <div class="topbar on-camera">
+      <button class="icon-btn" id="btn-flash" aria-label="Toggle flash" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" stroke-linejoin="round"/></svg>
+      </button>
+      <h1>Scan</h1>
+      <button class="icon-btn" id="btn-settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+      </button>
+    </div>
+
+    <div class="camera-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="overlay"></canvas>
+
+      <div class="camera-placeholder" id="camera-placeholder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8 7 9.6 4h4.8L16 7"/><circle cx="12" cy="13.5" r="3.4"/></svg>
+        <p id="camera-placeholder-text">Scanly needs camera access to scan your documents. Nothing leaves your device.</p>
+        <button class="text-btn primary" id="btn-enable-camera">Enable Camera</button>
+      </div>
+
+      <div class="confidence-pill" id="confidence-pill" hidden>
+        <span class="dot"></span><span id="confidence-text">Finding edges…</span>
+      </div>
+
+      <div class="filmstrip" id="filmstrip"></div>
+
+      <div class="processing-overlay" id="capture-processing" hidden>
+        <div class="spinner"></div><span>Cropping page…</span>
+      </div>
+
+      <div class="capture-bar">
+        <div class="capture-side">
+          <div class="page-count-badge" id="btn-open-pages">
+            <span id="page-count">0</span>
+            <span>pages</span>
+          </div>
+        </div>
+        <button class="shutter" id="btn-shutter" aria-label="Capture page"></button>
+        <div class="capture-side">
+          <button class="icon-btn" id="btn-done" style="background:rgba(255,138,52,0.9); color:white;" hidden aria-label="Finish scanning">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="install-banner" id="install-banner" hidden>
+        <img src="icons/icon-192.png" alt="" />
+        <div class="txt"><strong>Add Scanly to your Home Screen</strong><span>Scan documents like a native app, even offline.</span></div>
+        <button class="install-cta" id="btn-install">Add</button>
+        <button class="dismiss" id="btn-install-dismiss" aria-label="Dismiss">&times;</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ REVIEW / EDIT SCREEN ============ -->
+  <section class="screen" id="review-screen" hidden>
+    <div class="topbar on-camera" style="position:relative; background:var(--ink);">
+      <button class="text-btn" id="btn-retake" style="color:rgba(255,255,255,0.85)">Retake</button>
+      <h1 style="color:white;">Adjust</h1>
+      <button class="text-btn primary" id="btn-keep">Keep</button>
+    </div>
+    <div class="review-canvas-wrap">
+      <canvas id="review-canvas"></canvas>
+    </div>
+    <div class="filter-chips" id="filter-chips">
+      <button class="chip active" data-filter="color">Original</button>
+      <button class="chip" data-filter="enhance">Enhance</button>
+      <button class="chip" data-filter="bw">B &amp; W</button>
+      <button class="chip" data-filter="gray">Grayscale</button>
+    </div>
+    <div class="adjust-sheet">
+      <div class="slider-row">
+        <label for="s-bright">Brightness</label>
+        <input type="range" id="s-bright" min="-60" max="60" value="0" />
+      </div>
+      <div class="slider-row">
+        <label for="s-contrast">Contrast</label>
+        <input type="range" id="s-contrast" min="-60" max="60" value="10" />
+      </div>
+      <div class="slider-row">
+        <label for="s-sat">Saturation</label>
+        <input type="range" id="s-sat" min="-100" max="100" value="0" />
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PAGES / BUILDER SCREEN ============ -->
+  <section class="screen" id="pages-screen" hidden>
+    <div class="topbar on-light">
+      <button class="text-btn" id="btn-pages-back">Scan</button>
+      <h1>Document</h1>
+      <button class="icon-btn" id="btn-clear-pages" aria-label="Start over">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z"/></svg>
+      </button>
+    </div>
+    <div class="content-scroll">
+      <div class="doc-title-field">
+        <input type="text" id="doc-title" placeholder="Untitled scan" maxlength="60" />
+        <div class="meta" id="doc-meta">0 pages</div>
+      </div>
+      <div class="section-label">Pages</div>
+      <div class="page-grid" id="page-grid"></div>
+    </div>
+    <div class="bottom-actions">
+      <button class="pill-btn ghost" id="btn-save-only">Save</button>
+      <button class="pill-btn solid" id="btn-export">Export PDF</button>
+    </div>
+  </section>
+
+  <!-- ============ LIBRARY SCREEN ============ -->
+  <section class="screen" id="library-screen" hidden>
+    <div class="topbar on-light">
+      <span style="width:38px"></span>
+      <h1>Library</h1>
+      <span style="width:38px"></span>
+    </div>
+    <div class="content-scroll" id="library-list-wrap">
+      <div id="library-list"></div>
+      <div class="empty-state" id="library-empty" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h11l5 5v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/><path d="M15 4v5h5"/></svg>
+        <h3>No scans yet</h3>
+        <p>Documents you scan and save will show up here, ready to reopen, export, or share.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TAB BAR (shown on scan & library) ============ -->
+  <nav class="tabbar" id="tabbar">
+    <button class="tab-btn active" data-tab="scan-screen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8 7 9.6 4h4.8L16 7"/><circle cx="12" cy="13.5" r="3.2"/></svg>
+      Scan
+    </button>
+    <button class="tab-btn" data-tab="library-screen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>
+      Library
+    </button>
+  </nav>
+
+  <!-- ============ VIEWER OVERLAY (from library) ============ -->
+  <div class="viewer-overlay" id="viewer-overlay" hidden>
+    <div class="topbar on-camera" style="position:relative; background:var(--ink);">
+      <button class="text-btn" id="btn-viewer-close" style="color:white;">Close</button>
+      <h1 id="viewer-title" style="color:white;">Scan</h1>
+      <button class="icon-btn" id="btn-viewer-share" style="color:white;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg>
+      </button>
+    </div>
+    <div class="viewer-pages" id="viewer-pages"></div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<!-- OpenCV.js — used for document-edge detection & perspective correction -->
+<script src="https://docs.opencv.org/4.9.0/opencv.js" async></script>
+<!-- jsPDF — used to assemble finished pages into a PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
