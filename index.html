@@ -169,11 +169,47 @@
     <div class="viewer-pages" id="viewer-pages"></div>
   </div>
 
+  <!-- ============ SETTINGS OVERLAY ============ -->
+  <div class="viewer-overlay" id="settings-overlay" hidden>
+    <div class="topbar on-camera" style="position:relative; background:var(--ink);">
+      <span style="width:38px"></span>
+      <h1 style="color:white;">Settings</h1>
+      <button class="text-btn primary" id="btn-settings-close">Done</button>
+    </div>
+    <div class="content-scroll" style="padding:16px;">
+      <div class="settings-row">
+        <div class="settings-row-txt">
+          <strong>Auto-capture</strong>
+          <span>Capture automatically once a page holds steady and aligned.</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="toggle-autocapture" checked />
+          <span class="switch-track"></span>
+        </label>
+      </div>
+      <div class="settings-row" id="cv-status-row">
+        <div class="settings-row-txt">
+          <strong>Smart edge detection</strong>
+          <span id="cv-status-text">Loading detector…</span>
+        </div>
+      </div>
+      <div class="section-label">Data</div>
+      <button class="settings-action" id="btn-clear-library">Delete all saved scans</button>
+      <div class="section-label">About</div>
+      <div class="settings-row">
+        <div class="settings-row-txt">
+          <strong>Scanly</strong>
+          <span>Version 1.0 · Scans are processed and stored on this device only.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="toast"></div>
 </div>
 
 <!-- OpenCV.js — used for document-edge detection & perspective correction -->
-<script src="https://docs.opencv.org/4.9.0/opencv.js" async></script>
+<script src="https://docs.opencv.org/4.x/opencv.js" async onerror="window.__cvLoadFailed = true;"></script>
 <!-- jsPDF — used to assemble finished pages into a PDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="app.js"></script>

@@ -46,6 +46,10 @@ const viewerTitle = $('viewer-title');
 
 const installBanner = $('install-banner');
 
+const settingsOverlay = $('settings-overlay');
+const cvStatusText = $('cv-status-text');
+const toggleAutocapture = $('toggle-autocapture');
+
 /* ---------------- App state ---------------- */
 let stream = null;
 let cvReady = false;
@@ -63,6 +67,23 @@ let currentTitle = '';
 
 const AUTO_CAPTURE_FRAMES = 7;   // ~ 7 * 110ms ≈ 0.77s held steady
 const LOCK_THRESHOLD = 0.42;
+
+let autoCaptureEnabled = localStorage.getItem('scanly_autocapture') !== '0';
+toggleAutocapture.checked = autoCaptureEnabled;
+toggleAutocapture.addEventListener('change', () => {
+  autoCaptureEnabled = toggleAutocapture.checked;
+  localStorage.setItem('scanly_autocapture', autoCaptureEnabled ? '1' : '0');
+});
+
+$('btn-settings').addEventListener('click', () => { settingsOverlay.hidden = false; });
+$('btn-settings-close').addEventListener('click', () => { settingsOverlay.hidden = true; });
+$('btn-clear-library').addEventListener('click', async () => {
+  if (window.confirm('Delete all saved scans? This cannot be undone.')) {
+    await dbClearAll();
+    showToast('All saved scans deleted');
+    if (!$('library-screen').hidden) renderLibrary();
+  }
+});
 
 const FILTER_PRESETS = {
   color:   { bright: 0, contrast: 10, sat: 0 },
@@ -185,15 +206,47 @@ function setupFlashButton() {
 /* ================================================================
    EDGE DETECTION (OpenCV.js)
    ================================================================ */
+let cvStatus = 'loading'; // 'loading' | 'ready' | 'unavailable'
+const CV_TIMEOUT_MS = 12000;
+const cvWaitStart = performance.now();
+
+function updateCvStatusUI() {
+  const map = {
+    loading: 'Loading detector…',
+    ready: 'Active — auto-detects page edges',
+    unavailable: 'Unavailable on this connection — capture manually with the shutter',
+  };
+  cvStatusText.textContent = map[cvStatus];
+  if (cvStatus === 'unavailable') {
+    showToast('Smart edge detection unavailable — tap the shutter to capture manually', 3400);
+  }
+}
+
 function waitForCv() {
   const poll = setInterval(() => {
     if (window.cv && typeof cv.Mat === 'function') {
       clearInterval(poll);
       cvReady = true;
+      cvStatus = 'ready';
+      updateCvStatusUI();
+      return;
+    }
+    if (window.__cvLoadFailed || performance.now() - cvWaitStart > CV_TIMEOUT_MS) {
+      clearInterval(poll);
+      cvStatus = 'unavailable';
+      updateCvStatusUI();
     }
   }, 200);
 }
 waitForCv();
+
+function showFallbackPill() {
+  confidencePill.hidden = false;
+  confidencePill.classList.remove('locked');
+  confidenceText.textContent = cvStatus === 'loading'
+    ? 'Loading smart detector…'
+    : 'Tap the shutter to capture';
+}
 
 const detectCanvas = document.createElement('canvas');
 const detectCtx = detectCanvas.getContext('2d', { willReadFrequently: true });
@@ -209,7 +262,8 @@ function detectFrame() {
   if ($('scan-screen').hidden || !stream) { detecting = false; return; }
   requestAnimationFrame(detectFrame);
 
-  if (!cvReady || video.readyState < 2 || !video.videoWidth) return;
+  if (video.readyState < 2 || !video.videoWidth) return;
+  if (!cvReady) { showFallbackPill(); return; }
   const now = performance.now();
   if (now - lastDetectTime < 110) return;
   lastDetectTime = now;
@@ -348,7 +402,7 @@ function updateConfidence() {
 
   if (locked) {
     stableCount++;
-    if (stableCount >= AUTO_CAPTURE_FRAMES && autoArmed && !capturing) {
+    if (stableCount >= AUTO_CAPTURE_FRAMES && autoArmed && !capturing && autoCaptureEnabled) {
       autoArmed = false;
       capturePage(true);
     }
@@ -639,6 +693,14 @@ async function dbDelete(id) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).delete(id);
+    tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
+  });
+}
+async function dbClearAll() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).clear();
     tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
   });
 }
