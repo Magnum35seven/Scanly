@@ -1,0 +1,126 @@
+<!-- overlay.html - camera overlay and camera handling script -->
+<div id="camera-overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="camera-overlay-title">
+  <div class="overlay-content">
+    <h2 id="camera-overlay-title">Camera access required</h2>
+    <p id="camera-overlay-message">We need access to your camera to scan documents.</p>
+    <div class="overlay-actions">
+      <button id="start-camera" type="button">Allow camera</button>
+      <button id="close-overlay" type="button">Not now</button>
+    </div>
+  </div>
+</div>
+
+<video id="camera-preview" autoplay playsinline style="display:none" muted></video>
+
+<script>
+// overlay.html - camera access handling
+(function () {
+  const OVERLAY_KEY = 'scanly_camera_overlay_state'; // values: dismissed, granted
+  const overlay = document.getElementById('camera-overlay');
+  const startBtn = document.getElementById('start-camera');
+  const closeBtn = document.getElementById('close-overlay');
+  const messageEl = document.getElementById('camera-overlay-message');
+  const video = document.getElementById('camera-preview');
+  let currentStream = null;
+
+  function showOverlay() {
+    if (!overlay) return;
+    overlay.style.display = 'block';
+    overlay.setAttribute('aria-hidden', 'false');
+  }
+  function hideOverlay(remove = false) {
+    if (!overlay) return;
+    if (remove) overlay.remove();
+    else {
+      overlay.style.display = 'none';
+      overlay.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  function stopStream(stream) {
+    if (!stream) return;
+    stream.getTracks().forEach(t => t.stop());
+  }
+
+  async function startCamera() {
+    try {
+      // Request camera access once
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      currentStream = stream;
+      // Attach stream to video element
+      if (video) {
+        video.srcObject = stream;
+        video.style.display = '';
+      }
+      // persist state so we don't keep showing the overlay
+      try { localStorage.setItem(OVERLAY_KEY, 'granted'); } catch (e) { /* ignore */ }
+      hideOverlay(true);
+    } catch (err) {
+      console.warn('getUserMedia error:', err);
+      // Differentiate between denial and other errors
+      if (err && (err.name === 'NotAllowedError' || err.name === 'SecurityError' || err.name === 'PermissionDeniedError')) {
+        messageEl.textContent = 'Camera access blocked. To use the scanner, allow camera access in your browser/site settings.';
+        // persist that the user denied so we don't keep prompting repeatedly
+        try { localStorage.setItem(OVERLAY_KEY, 'dismissed'); } catch (e) {}
+      } else {
+        messageEl.textContent = 'Unable to access camera. Please try again or use an alternative upload method.';
+      }
+      // don't remove overlay here so user can read message and choose to retry or close
+    }
+  }
+
+  // Permissions API integration (optional graceful handling)
+  function watchPermissions() {
+    if (!navigator.permissions || !navigator.permissions.query) return;
+    navigator.permissions.query({ name: 'camera' }).then(permissionStatus => {
+      // If already granted, start camera automatically and remove overlay
+      if (permissionStatus.state === 'granted') {
+        startCamera().catch(()=>{});
+      }
+      permissionStatus.onchange = () => {
+        if (permissionStatus.state === 'granted') {
+          startCamera().catch(()=>{});
+        }
+      };
+    }).catch(() => {
+      // Permissions API not available or camera not supported; nothing to do
+    });
+  }
+
+  // Prevent re-show logic: only show overlay if user hasn't dismissed or granted
+  function shouldShowOverlay() {
+    try {
+      const val = localStorage.getItem(OVERLAY_KEY);
+      if (val === 'granted' || val === 'dismissed') return false;
+    } catch (e) {
+      // localStorage might be unavailable in some contexts
+    }
+    return true;
+  }
+
+  // Wire buttons
+  if (startBtn) startBtn.addEventListener('click', () => startCamera());
+  if (closeBtn) closeBtn.addEventListener('click', () => {
+    try { localStorage.setItem(OVERLAY_KEY, 'dismissed'); } catch (e) {}
+    hideOverlay(true);
+    // If a stream is active, stop it
+    if (currentStream) stopStream(currentStream);
+  });
+
+  // When the page unloads or navigates away, stop camera to release resources
+  window.addEventListener('beforeunload', () => {
+    if (currentStream) stopStream(currentStream);
+  });
+
+  // Initial show/hide behavior
+  try {
+    if (shouldShowOverlay()) showOverlay();
+    else hideOverlay();
+  } catch (e) {
+    // don't block if DOM operations fail
+  }
+
+  // Start watching permission changes
+  watchPermissions();
+})();
+</script>
