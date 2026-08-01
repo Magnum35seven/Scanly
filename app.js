@@ -262,7 +262,7 @@ function detectFrame() {
   if ($('scan-screen').hidden || !stream) { detecting = false; return; }
   requestAnimationFrame(detectFrame);
 
-  if (video.readyState < 2 || !video.videoWidth) return;
+  if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) return;
   if (!cvReady) { showFallbackPill(); return; }
   const now = performance.now();
   if (now - lastDetectTime < 110) return;
@@ -351,14 +351,18 @@ function videoToCanvasTransform() {
 function mapPt(x, y, t) { return [x * t.scale + t.offsetX, y * t.scale + t.offsetY]; }
 
 function drawOverlay() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
   overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
   if (!lastQuad) return;
+  
+  overlayCtx.save();
+  overlayCtx.scale(dpr, dpr);
+  
   const t = videoToCanvasTransform();
   const pts = lastQuad.points.map(([x, y]) => mapPt(x, y, t));
   const locked = lastQuad.confidence >= LOCK_THRESHOLD;
   const color = locked ? '#34d399' : '#ffb74d';
 
-  overlayCtx.save();
   overlayCtx.strokeStyle = color;
   overlayCtx.lineWidth = 3;
   overlayCtx.globalAlpha = 0.9;
@@ -398,7 +402,7 @@ function updateConfidence() {
   confidencePill.hidden = false;
   const locked = lastQuad.confidence >= LOCK_THRESHOLD;
   confidencePill.classList.toggle('locked', locked);
-  confidenceText.textContent = locked ? 'Aligned — hold still' : 'Move closer / straighten';
+  confidenceText.textContent = locked ? 'Aligned �� hold still' : 'Move closer / straighten';
 
   if (locked) {
     stableCount++;
@@ -816,7 +820,7 @@ async function renderLibrary() {
         <p class="sub">${doc.pages.length} page${doc.pages.length === 1 ? '' : 's'} · ${dateStr}</p>
       </div>
       <button class="lib-more" aria-label="Delete scan">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z"/></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 [...]
       </button>`;
     item.querySelector('.lib-info').addEventListener('click', () => openViewer(doc));
     item.querySelector('.lib-thumb').addEventListener('click', () => openViewer(doc));
